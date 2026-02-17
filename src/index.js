@@ -3,12 +3,14 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const cors = require('cors');
 
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
 const pdfParse = require('pdf-parse');
 
 const app = express();
+app.use(cors()); // enable CORS for all routes (adjust options in production)
 const port = process.env.PORT || 3000;
 // Swagger setup
 const swaggerOptions = {

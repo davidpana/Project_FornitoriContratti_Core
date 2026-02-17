@@ -40,6 +40,9 @@ app.post('/api/notarize', upload.single('contract'), async (req, res) => {
       hash
     };
     
+    res.json({ 
+      success: true,
+      });
     // 3. Crea Locked Notarization (10 anni delete lock)
     const deleteUnlockAt = Math.round(Date.now() / 1000 + 315360000); // +10y
     const notarization = await client.lockedNotarization()
