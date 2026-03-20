@@ -66,6 +66,18 @@ const upload = multer({
 	}
 });
 
+app.get('/', (req, res) => {
+	res.json({
+		service: 'Project_FornitoriContratti_Core API',
+		status: 'ok',
+		docs: '/api-docs',
+	});
+});
+
+app.get('/health', (req, res) => {
+	res.json({ status: 'ok' });
+});
+
 
 /**
  * @openapi
