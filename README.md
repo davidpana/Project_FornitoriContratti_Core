@@ -1,95 +1,180 @@
+# Project FornitoriContratti Core
+
+Backend Node.js/Express per:
+
+- upload di PDF di contratto;
+- calcolo hash SHA-256 del documento;
+- notarizzazione hash su IOTA Testnet;
+- verifica notarizzazione tramite ID;
+- endpoint Swagger per test rapidi API.
+
+## Funzionalita principali
+
+- Upload PDF via multipart/form-data (`/upload`)
+- Calcolo SHA-256 del file caricato
+- Notarizzazione hash su IOTA (`/api/notarize`)
+- Verifica notarizzazione (`/api/verify/:notarizationId`)
+- Stato wallet (`/api/wallet/status`)
+- Richiesta fondi faucet (`/api/faucet/request`)
+- Documentazione API Swagger (`/api-docs`)
+
+## Requisiti
+
+- Node.js 18+ (consigliato 20+)
+- npm
+- Connessione internet verso IOTA testnet e faucet
+
+## Installazione
+
+```bash
 npm install
-npm start
-
-# Project_FornitoriContratti_Core
-
-Node.js backend project for FornitoriContratti Core.
-
-## Getting Started
-
-1. Install dependencies:
-   ```
-   npm install
-   ```
-2. Run the project:
-   ```
-   npm start
-   ```
-
-## API Endpoints
-
-### POST /upload
-
-Upload a PDF file via multipart/form-data.
-
-**Request:**
-  - Method: POST
-  - URL: `http://localhost:3000/upload`
-  - Body: Form-data with key `pdf` and the PDF file as value
-
-**Response:**
-  - 200 OK: `{ message: 'PDF uploaded successfully!', filename: '<saved-filename>' }`
-  - 400 Bad Request: `{ error: 'No file uploaded or file is not a PDF.' }`
-
-**Example using curl:**
-```sh
-curl -F "pdf=@yourfile.pdf" http://localhost:3000/upload
 ```
 
-## IOTA Testnet Notarization Setup
+## Configurazione ambiente
 
-1. Copy [.env.example](.env.example) to .env and set your mnemonic:
-  ```
-  copy .env.example .env
-  ```
-2. Set IOTA testnet values in .env:
-  - IOTA_NODE_URL
-  - IOTA_MNEMONIC
-  - IOTA_FAUCET_URL
-3. Start the API:
-  ```
-  npm start
-  ```
+1. Crea file `.env` partendo da `.env.example`:
 
-## New Endpoints
+```powershell
+Copy-Item .env.example .env
+```
 
-### GET /api/wallet/status
+2. Imposta almeno la variabile obbligatoria:
 
-Returns wallet address, current balance and if minimum funds are available.
+- `IOTA_MNEMONIC` (obbligatoria)
 
-### POST /api/faucet/request
+3. Opzionalmente personalizza:
 
-Requests testnet funds for the backend wallet.
-- If IOTA_FAUCET_URL is configured, it performs an automatic POST.
-- If IOTA_FAUCET_URL is empty, it returns wallet address and manual instructions.
+- `PORT` (default `3000`)
+- `IOTA_NODE_URL`
+- `IOTA_DERIVATION_PATH`
+- `IOTA_ACCOUNT_INDEX`
+- `IOTA_MIN_BALANCE`
+- `IOTA_DELETE_UNLOCK_SECONDS`
+- `IOTA_EXPLORER_BASE_URL`
+- `IOTA_FAUCET_URL`
 
-### POST /api/notarize
+## Avvio progetto
 
-Stores the SHA-256 hash on IOTA testnet using locked notarization.
+```bash
+npm start
+```
 
-Request body example:
+Server disponibile su:
+
+- API base: `http://localhost:3000`
+- Swagger UI: `http://localhost:3000/api-docs`
+
+## Script disponibili
+
+- `npm start` - Avvia server Express
+- `npm run smoke:notarization` - Esegue smoke test completo (wallet, faucet, upload, notarize, verify)
+
+## API principali
+
+### 1) Upload PDF
+
+`POST /upload`
+
+Body `multipart/form-data`:
+
+- key: `pdf`
+- value: file PDF
+
+Esempio curl:
+
+```bash
+curl -F "pdf=@CONTRATTO%20DI%20FORNITURA.pdf" http://localhost:3000/upload
+```
+
+Risposta (esempio):
+
 ```json
 {
-  "hash": "<64-char-sha256-hex>",
+  "message": "PDF uploaded successfully!",
+  "filename": "1742480000000-CONTRATTO DI FORNITURA.pdf",
+  "sha256": "..."
+}
+```
+
+### 2) Stato wallet
+
+`GET /api/wallet/status`
+
+Restituisce address, balance, minimumBalance e `hasEnoughFunds`.
+
+### 3) Richiesta faucet
+
+`POST /api/faucet/request`
+
+Richiede fondi testnet per il wallet backend.
+
+### 4) Notarizzazione hash
+
+`POST /api/notarize`
+
+Body JSON:
+
+```json
+{
+  "hash": "<sha256-64-char-hex>",
   "metadata": {
-   "filename": "contract.pdf",
-   "contractId": "CF-2026-001"
+    "filename": "contract.pdf",
+    "contractId": "CF-2026-001"
   }
 }
 ```
 
-Response includes messageId and explorer URL.
+Risposta include `notarizationId`, `transactionDigest`, `explorerUrl`.
 
-Response includes notarizationId, transactionDigest and explorer URL.
+### 5) Verifica notarizzazione
 
-### GET /api/verify/:notarizationId
+`GET /api/verify/:notarizationId`
 
-Reads back the anchored payload from IOTA testnet and returns parsed content.
+Restituisce payload notarizzato e metadati di stato.
 
-## Suggested End-to-End Flow
+## Smoke test end-to-end
 
-1. Upload document via /upload and read sha256 from response.
-2. Call /api/wallet/status.
-3. If no funds, call /api/faucet/request and wait faucet confirmation.
-4. Call /api/notarize with hash from step 1.
-5. Call /api/verify/:notarizationId to validate persistence on testnet.
+Il progetto include uno script che verifica il flusso completo.
+
+Prerequisiti:
+
+- server avviato (`npm start`)
+- file test presente (`CONTRATTO DI FORNITURA.pdf` in root o in `uploads`)
+- `.env` configurato
+
+Esecuzione:
+
+```bash
+npm run smoke:notarization
+```
+
+## Flusso consigliato
+
+1. Upload documento via `/upload`
+2. Controllo fondi via `/api/wallet/status`
+3. Se necessario, faucet via `/api/faucet/request`
+4. Notarizzazione hash via `/api/notarize`
+5. Verifica via `/api/verify/:notarizationId`
+
+## Errori comuni
+
+- `IOTA_MNEMONIC is missing in environment variables`
+: imposta `IOTA_MNEMONIC` in `.env`.
+
+- `Insufficient funds ...`
+: richiama `/api/faucet/request` e riprova dopo conferma faucet.
+
+- `hash must be a valid sha256 hex string (64 chars)`
+: invia un hash SHA-256 valido in formato esadecimale.
+
+## Sicurezza
+
+- Non committare mai `.env` con mnemonic reali.
+- Usa secret manager in ambienti condivisi/production.
+
+## Stack tecnico
+
+- Express
+- Multer
+- Swagger (`swagger-jsdoc`, `swagger-ui-express`)
+- IOTA SDK (`@iota/iota-sdk`, `@iota/notarization`)
