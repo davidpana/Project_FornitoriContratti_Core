@@ -4,13 +4,17 @@
   "description": "Node.js backend project for FornitoriContratti Core.",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "smoke:notarization": "node scripts/smoke-notarization.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@iota/iota-sdk": "^1.11.0",
+    "@iota/notarization": "^0.1.10",
     "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "multer": "^2.0.2",
     "pdf-parse": "^2.4.5",

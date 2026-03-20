@@ -4,13 +4,21 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
+require('dotenv').config();
 
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
 const pdfParse = require('pdf-parse');
+const {
+	notarizeHash,
+	verifyNotarization,
+	requestFaucetFunding,
+	getWalletStatus,
+} = require('./services/iotaNotarizationService');
 
 const app = express();
 app.use(cors()); // enable CORS for all routes (adjust options in production)
+app.use(express.json());
 const port = process.env.PORT || 3000;
 // Swagger setup
 const swaggerOptions = {
@@ -133,6 +141,129 @@ app.post('/upload', upload.single('pdf'), async (req, res) => {
 		sha256: hash,
 		//metadata: metadata
 	});
+});
+
+/**
+ * @openapi
+ * /api/notarize:
+ *   post:
+ *     summary: Notarize a SHA-256 hash on IOTA testnet
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - hash
+ *             properties:
+ *               hash:
+ *                 type: string
+ *                 description: SHA-256 hash (64 hex chars)
+ *               metadata:
+ *                 type: object
+ *                 additionalProperties: true
+ *                 description: Optional metadata linked to the hash
+ *     responses:
+ *       200:
+ *         description: Hash notarized successfully
+ *       400:
+ *         description: Invalid input
+ *       402:
+ *         description: Wallet has insufficient funds, use faucet
+ *       500:
+ *         description: Unexpected server error
+ */
+app.post('/api/notarize', async (req, res) => {
+	try {
+		const { hash, metadata } = req.body || {};
+		if (!hash) {
+			return res.status(400).json({ error: 'hash is required' });
+		}
+
+		const result = await notarizeHash({ hash, metadata: metadata || {} });
+		res.json({
+			success: true,
+			...result,
+		});
+	} catch (error) {
+		if (error.code === 'INSUFFICIENT_FUNDS') {
+			return res.status(402).json({
+				error: error.message,
+				wallet: error.walletStatus,
+				nextStep: 'Call POST /api/faucet/request or request funds manually from testnet faucet.',
+			});
+		}
+		if (error.message && error.message.includes('sha256')) {
+			return res.status(400).json({ error: error.message });
+		}
+		res.status(500).json({ error: error.message || 'Failed to notarize hash' });
+	}
+});
+
+/**
+ * @openapi
+ * /api/verify/{notarizationId}:
+ *   get:
+ *     summary: Verify hash notarization from IOTA testnet
+ *     parameters:
+ *       - in: path
+ *         name: notarizationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Verification result
+ *       404:
+ *         description: Notarization not found
+ */
+app.get('/api/verify/:notarizationId', async (req, res) => {
+	try {
+		const result = await verifyNotarization(req.params.notarizationId);
+		if (!result.found) {
+			return res.status(404).json(result);
+		}
+		res.json(result);
+	} catch (error) {
+		res.status(500).json({ error: error.message || 'Failed to verify notarization' });
+	}
+});
+
+/**
+ * @openapi
+ * /api/wallet/status:
+ *   get:
+ *     summary: Get IOTA testnet wallet status used for notarization
+ *     responses:
+ *       200:
+ *         description: Wallet info and current balance
+ */
+app.get('/api/wallet/status', async (req, res) => {
+	try {
+		const status = await getWalletStatus();
+		res.json(status);
+	} catch (error) {
+		res.status(500).json({ error: error.message || 'Failed to read wallet status' });
+	}
+});
+
+/**
+ * @openapi
+ * /api/faucet/request:
+ *   post:
+ *     summary: Request testnet funds from faucet for the notarization wallet
+ *     responses:
+ *       200:
+ *         description: Faucet request submitted or manual instructions returned
+ */
+app.post('/api/faucet/request', async (req, res) => {
+	try {
+		const faucetResult = await requestFaucetFunding();
+		res.json(faucetResult);
+	} catch (error) {
+		res.status(500).json({ error: error.message || 'Failed to request faucet funding' });
+	}
 });
 
 
